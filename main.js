@@ -23,7 +23,10 @@ const sankey = d3Sankey.sankey()
 
 
 async function init() {
-  const data = await d3.json("data/data_sankey.json");
+  // const data = await d3.json("data/data_sankey.json");
+  const jmuDataRaw = await d3.json("data/jmu.json");
+  const data = forStudentCosts(jmuDataRaw);
+
   // Applies it to the data. We make a copy of the nodes and links objects
   // so as to avoid mutating the original.
   const { nodes, links } = sankey({
@@ -128,3 +131,52 @@ async function init() {
 }
 
 init();
+
+
+function forStudentCosts(jmuData) {
+  const costData = jmuData["student-costs"];
+  const nodes = getStudentNodes(costData);
+  const links = getStudentLinks(costData);
+  return { nodes, links };
+}
+
+function getStudentNodes(costData) {
+  const nodeNames = new Set(["JMU Student", "Fall", "Spring"]);
+  costData.forEach(d => nodeNames.add(d.name));
+  return Array.from(nodeNames).map(name => ({
+    name,
+    title: name,
+    category: inferCategory(name)
+  }));
+}
+
+function inferCategory(name) {
+  if (name === "JMU Student") return "origin";
+  if (name === "Fall" || name === "Spring") return "semester";
+  return "cost";
+}
+
+function getStudentLinks(costData) {
+  const links = [];
+
+  const fallTotal = costData
+    .filter(d => d.semester === "Fall")
+    .reduce((sum, d) => sum + d["in-state"], 0);
+
+  const springTotal = costData
+    .filter(d => d.semester === "Spring")
+    .reduce((sum, d) => sum + d["in-state"], 0);
+
+  links.push({ source: "JMU Student", target: "Fall", value: fallTotal });
+  links.push({ source: "JMU Student", target: "Spring", value: springTotal });
+
+  costData.forEach(d => {
+    links.push({
+      source: d.semester,
+      target: d.name,
+      value: d["in-state"]
+    });
+  });
+
+  return links;
+}
